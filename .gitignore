@@ -36,3 +36,7 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+
+#config files
+apps/excalidraw-fe/excalidraw-fe/config.ts
