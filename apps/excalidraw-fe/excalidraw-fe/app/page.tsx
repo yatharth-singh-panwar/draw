@@ -1,6 +1,6 @@
 import React from 'react';
-import { Pencil, Share2, Users, Sparkles, ChevronRight, Github } from 'lucide-react';
-
+import { Pencil, Share2, Camera, Sparkles, ChevronRight, Github } from 'lucide-react';
+import { Button } from './components/buttons/button';
 function App() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-secondary to-secondary-light text-white">
@@ -9,19 +9,17 @@ function App() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Pencil className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">DrawFlow</span>
+            <span className="text-2xl font-bold">Draw</span>
           </div>
           <div className="hidden md:flex items-center space-x-8">
             <a href="#features" className="hover:text-primary transition-colors">Features</a>
             <a href="#about" className="hover:text-primary transition-colors">About</a>
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+            <a href="https://github.com/yatharth-singh-panwar/draw" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
               <Github className="h-6 w-6" />
             </a>
-            <button className="bg-primary hover:bg-primary-dark px-6 py-2 rounded-lg transition-colors">
-              Try Now
-            </button>
+                <Button text='Signin' redirectLink='/signin'></Button>
           </div>
-        </div>
+      </div>
       </nav>
 
       {/* Hero Section */}
@@ -38,15 +36,12 @@ function App() {
             <span>Start Drawing</span>
             <ChevronRight className="h-5 w-5" />
           </button>
-          <button className="border border-primary text-primary hover:bg-primary/10 px-8 py-4 rounded-lg transition-colors w-full md:w-auto">
-            Watch Demo
-          </button>
         </div>
       </section>
 
       {/* Features Section */}
       <section id="features" className="container mx-auto px-6 py-20">
-        <h2 className="text-4xl font-bold text-center mb-16">Why Choose DrawFlow?</h2>
+        <h2 className="text-4xl font-bold text-center mb-16">Why Choose Draw?</h2>
         <div className="grid md:grid-cols-3 gap-12">
           <div className="text-center">
             <div className="bg-primary/10 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6">
@@ -57,10 +52,10 @@ function App() {
           </div>
           <div className="text-center">
             <div className="bg-primary/10 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6">
-              <Users className="h-8 w-8 text-primary" />
+              <Camera className="h-8 w-8 text-primary" />
             </div>
-            <h3 className="text-xl font-semibold mb-4">Team Friendly</h3>
-            <p className="text-gray-300">Built for teams of all sizes. Easily manage permissions and share your work.</p>
+            <h3 className="text-xl font-semibold mb-4">Video Chat</h3>
+            <p className="text-gray-300">Communicate seamlessly with integrated video chat for enhanced collaboration.</p>
           </div>
           <div className="text-center">
             <div className="bg-primary/10 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6">
@@ -88,7 +83,7 @@ function App() {
         <div className="flex flex-col md:flex-row justify-between items-center">
           <div className="flex items-center space-x-2 mb-4 md:mb-0">
             <Pencil className="h-6 w-6 text-primary" />
-            <span className="font-semibold">DrawFlow</span>
+            <span className="font-semibold">Draw</span>
           </div>
           <div className="flex space-x-6">
             <a href="#" className="text-gray-400 hover:text-primary transition-colors">Terms</a>
