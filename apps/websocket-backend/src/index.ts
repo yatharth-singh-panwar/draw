@@ -38,14 +38,12 @@ function authenticateUser(token: string): string | null {
 wss.on('connection', function connection(ws, request) {
   //1. Extract the token from the query parameter
   const url = request.url;
-  console.log("The request url is", url);
   if(!url){
     ws.close();
     return;
   }
   const queryParams = new URLSearchParams(request.url?.split('?')[1]);
   const token = queryParams?.get("token") || "";
-  console.log("Token that is being sent to authenticate is", token);
   const userId = authenticateUser(token);
   console.log("The userId is", userId);
   if (userId == null) {
@@ -60,8 +58,6 @@ wss.on('connection', function connection(ws, request) {
       userId: userId
     }
   )
-  console.log(users);
-
   
   ws.on('message', async function message(data){
     let parsedData;

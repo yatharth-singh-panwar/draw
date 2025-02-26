@@ -2,6 +2,7 @@ import { BACKEND_URL } from "@/config";
 import axios from "axios";
 import Space from "../components/space";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 async function getUserSpaces() {
     try {
@@ -26,6 +27,9 @@ async function getUserSpaces() {
 }
 export default async function UserSpace() {
     const spaces = await getUserSpaces();
+    if(!spaces){
+        redirect('/signin');
+    }
     
     return (
         <>
@@ -33,7 +37,7 @@ export default async function UserSpace() {
             {spaces.map(space => (
                 <div className="w-80 h-full flex items-center justify-center" key={space.id}>
                     <div>
-                        <Space name={space.slug}></Space>
+                        <Space id={space.id} name={space.slug}></Space>
                     </div>
                 </div>
             ))}

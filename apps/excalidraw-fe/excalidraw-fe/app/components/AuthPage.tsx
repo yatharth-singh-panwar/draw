@@ -100,6 +100,10 @@ export default function AuthPage({isSignin} : {isSignin: boolean}){
                     </button>
                 </div>
             </div>
+            {isSignin && 
+            <div className="text-white w-full  flex flex-col items-center mt-2">
+                <p>Dont have an account? <a className="text-blue-700 hover:text-blue-900" href="/signup">Click here to sign up!</a></p>
+            </div>}
         </div>
         </div>
         </div> 

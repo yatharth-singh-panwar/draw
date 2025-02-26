@@ -5,13 +5,23 @@ import dotenv from "dotenv";
 import { prismaClient } from "@repo/db/src/index";
 import { authentication } from "./authentication";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
 const app = express();
+// Removed unnecessary variable assignment
 
+app.use(cors({
+    origin: "http://localhost:3000", // Change this to match your frontend URL
+    credentials: true
+}));
+app.use(cookieParser());
 app.use(express.json());
-app.use(cors());
+app.use((req, res, next) => {
+    console.log("Cookies:", req.cookies);
+    next();
+});
 
 const JWT_KEY = process.env.JWT_PASS;
 
@@ -89,7 +99,7 @@ app.post('/signin', async (req: Request, res: Response)=> {
         signInStructure.parse({userName: userName, pass: password});
     }
     catch(e){
-        res.send({
+        res.status(400).send({
             msg:"Input validation error",
             error: e
         })
@@ -98,7 +108,6 @@ app.post('/signin', async (req: Request, res: Response)=> {
     //search for the user in the database.
     let userid;
     try{
-        
         const user = await prismaClient.user.findUnique({
             where:{
                 userName:userName,
@@ -107,7 +116,7 @@ app.post('/signin', async (req: Request, res: Response)=> {
         })
 
         if(!user){
-            res.send({
+            res.status(404).send({
                 msg:"No user found. Try again"
             })
             return;
@@ -115,7 +124,7 @@ app.post('/signin', async (req: Request, res: Response)=> {
         userid = user.id;  
     }
     catch(e){
-        res.send({
+        res.status(500).send({
             msg:"internal server error"
         })
     }
@@ -124,22 +133,26 @@ app.post('/signin', async (req: Request, res: Response)=> {
 
     //Find the userId and put it in the jwtToken
     const jwtToken =  jwt.sign(userid as string, JWT_KEY);
-    console.log(userid);
-    res.send({  
-        msg:"Signed in successfully",
-        token: jwtToken
+    // @audit-issue - Do not set secure to true for security reasons.
+    res.cookie("jwt", jwtToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production" ? true : false, // Disable secure in development
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Use "lax" for local testing
+    });
+    res.status(200).send({  
+        msg:"Signed in successfully"
     })
 })
 
+app.use(authentication);
 
 //Create room endpoint
-app.post('/roomjoin', authentication,async (req: Request, res: Response) => {
+app.post('/roomjoin',async (req: Request, res: Response) => {
     //@ts-ignore
     const userId = req.headers['userid'];
     console.log("The userId is ",userId);
     const slug = req.body.name;
     try{
-    
         const room  = await prismaClient.room.create({
             data:{
                 slug: slug,
@@ -198,4 +211,27 @@ app.get("/room/:slug", async (req, res) => {
     })
 })
 
+
+// get all the user rooms in the database
+app.post("/space", async (req, res) => {
+    const userId = req.headers['userid'] as string;
+    if(!userId){
+        return
+    }
+    try {
+        const spaces = await prismaClient.room.findMany({
+            where: {
+                adminId: userId
+            }
+        });
+        res.status(200).send({
+            spaces
+        });
+    } catch (e) {
+        res.status(500).send({
+            msg: "Internal server error",
+            error: e
+        });
+    }
+});
 app.listen(4000)

@@ -1,7 +1,8 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { BACKEND_URL } from "../../../../config"
-import { useRef, MutableRefObject, RefObject } from 'react';
-
+import { RefObject } from 'react';
+import { useRouter } from 'next/navigation';
+import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 //interface for all the types of shapes.
 interface shapeDimentions{
     type: "rect" | "circle",
@@ -14,9 +15,31 @@ interface shapeDimentions{
 
 
 //get all the existing shapes and then render it.
-async function getExistingShapes(roomId : string){
+async function getExistingShapes(roomId : string, jwt:string, router: AppRouterInstance){
+    console.log(jwt);
+    if (!jwt) {
+        console.log("reached the state")
+        router.push('/signin');
+        return [];
+    }
+    let res;
+    try{
+        res = await axios.get(`${BACKEND_URL}`+`/chats/${roomId}`,{
+            headers:{
+                cookie:`jwt=${jwt}`
+            },
+            withCredentials:true
+        });
 
-    const res = await axios.get(`${BACKEND_URL}`+`/chats/${roomId}`);
+    }
+    catch(error){
+        if(axios.isAxiosError(error) && error.response){
+            if(error.response.status == 403){
+                router.push('/signin');
+                return [];
+            }
+        }
+    }
 
     const data = res.data.chats;
     console.log("The existing shapes are ", data);
@@ -68,7 +91,7 @@ function pushDrawingTodb(drawing: shapeDimentions, ws: WebSocket, roomId: string
 }
 
 
-export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws : WebSocket, type:string, mouseDownHandlerRef: RefObject<any>, mouseUpHandlerRef: RefObject<any>, mouseMoveHandlerRef: RefObject<any>){
+export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws : WebSocket, type:string, mouseDownHandlerRef: RefObject<any>, mouseUpHandlerRef: RefObject<any>, mouseMoveHandlerRef: RefObject<any>, jwt:string, router: AppRouterInstance){
 
     const ctx = canvas.getContext("2d"); 
     if(!ctx){
@@ -77,7 +100,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws 
 
     ctx.strokeStyle="white"
 
-    const drawings = await getExistingShapes(roomId);
+    const drawings = await getExistingShapes(roomId, jwt, router);
     rerenderCanvas(canvas, drawings);
 
     let clicked = false;

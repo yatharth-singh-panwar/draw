@@ -2,11 +2,12 @@
 import { useEffect, useRef, useState } from "react"
 import { canvasLogic } from "../canvas/[roomId]/draw";
 import {Square, Circle, Pencil} from "lucide-react";
+import { useRouter } from "next/navigation";
 
-export default function Canvas({roomId, ws} : {roomId: string, ws: WebSocket}){
+export default function Canvas({roomId, ws, jwt} : {roomId: string, ws: WebSocket, jwt: string}){
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [type, setType] = useState("");
-
+    const router = useRouter();
     //mouse event handler references.
     const mouseDownHandlerRef = useRef<(e: MouseEvent) => void | null>(null);
     const mouseMoveHandlerRef = useRef<(e: MouseEvent) => void | null>(null);
@@ -14,7 +15,10 @@ export default function Canvas({roomId, ws} : {roomId: string, ws: WebSocket}){
 
     useEffect(()=>{
         if(canvasRef.current){
-            canvasLogic(canvasRef.current, roomId, ws, type, mouseDownHandlerRef, mouseUpHandlerRef, mouseMoveHandlerRef);
+            if(!jwt){
+                router.push(`${'/signin'}`);
+            }
+            canvasLogic(canvasRef.current, roomId, ws, type, mouseDownHandlerRef, mouseUpHandlerRef, mouseMoveHandlerRef,jwt, router);
         }
     }, [type])
     return(

@@ -5,6 +5,7 @@ interface Props {
     redirectLink?: string;
     color ?: string;
     hoverColor ?: string;
+    onclick ?: Function;
 }
 
 export function Button({ text, redirectLink, color, hoverColor }: Props) {
