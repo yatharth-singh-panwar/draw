@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import RenderSpaces from "./renderSpaces";
 import  DeleteModel  from "../components/DeleteModel";
+import Navbar from "../components/Navbar";
 
 async function getUserSpaces() {
     try {

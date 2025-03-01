@@ -16,6 +16,9 @@ export default {
         secondary: {
           DEFAULT: '#1e293b', // Slate-800
           light: '#334155',   // Slate-700
+        },
+        grayLine: {
+          DEFAULT: "#6b7280",
         }
       },
     },

@@ -160,8 +160,14 @@ app.post('/roomjoin',async (req: Request, res: Response) => {
                 adminId:userId as string
             }
         })
+        const newRoom = await prismaClient.room.findFirst({
+            where:{
+                slug: slug,
+                adminId:userId as string
+            }
+        })
         res.json({
-            roomId: room.id
+            newRoom : newRoom
         })
     }
     catch(e){
