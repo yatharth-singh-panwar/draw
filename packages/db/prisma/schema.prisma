@@ -36,6 +36,6 @@ model Chat {
   message    String
   userId     String
   roomId     Int
-  room      Room    @relation(fields: [roomId], references: [id]) 
+  room      Room    @relation(fields: [roomId], references: [id], onDelete: Cascade) 
   user      User    @relation(fields: [userId], references: [id])
 }

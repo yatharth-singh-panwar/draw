@@ -125,7 +125,8 @@ app.post('/signin', async (req: Request, res: Response)=> {
     }
     catch(e){
         res.status(500).send({
-            msg:"internal server error"
+            msg:"internal server error",
+            error: e
         })
     }
 
@@ -171,6 +172,27 @@ app.post('/roomjoin',async (req: Request, res: Response) => {
     }        
     return;
 
+})
+//Delete room
+app.delete('/space/:roomId', async (req: Request,res: Response)=>{
+    const roomId = Number(req.params.roomId);
+    console.log(roomId);
+    try{
+        await prismaClient.room.delete({
+            where:{
+                id: roomId
+            }
+        })
+        res.status(200).send({
+            msg:"Room deleted successfully"
+        })
+    }
+    catch(error){
+        res.status(500).send({
+            msg:"Error deleting the room",
+            error:error
+        })
+    }
 })
 
 

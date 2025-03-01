@@ -3,6 +3,8 @@ import axios from "axios";
 import Space from "../components/space";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import RenderSpaces from "./renderSpaces";
+import  DeleteModel  from "../components/DeleteModel";
 
 async function getUserSpaces() {
     try {
@@ -15,6 +17,7 @@ async function getUserSpaces() {
             },
             withCredentials:true
         })
+        console.log(res.data.spaces);
         return res.data.spaces;
     } catch (error) {
         if (axios.isAxiosError(error) && error.response) {
@@ -33,15 +36,7 @@ export default async function UserSpace() {
     
     return (
         <>
-        <div className="flex flex-row items-center justify-center p-10 gap-0">  
-            {spaces.map(space => (
-                <div className="w-80 h-full flex items-center justify-center" key={space.id}>
-                    <div>
-                        <Space id={space.id} name={space.slug}></Space>
-                    </div>
-                </div>
-            ))}
-        </div>
+            <RenderSpaces spaces={spaces}/>
         </>
     );
 }
