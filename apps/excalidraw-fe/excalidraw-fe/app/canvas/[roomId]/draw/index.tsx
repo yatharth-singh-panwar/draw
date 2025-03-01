@@ -16,9 +16,7 @@ interface shapeDimentions{
 
 //get all the existing shapes and then render it.
 async function getExistingShapes(roomId : string, jwt:string, router: AppRouterInstance){
-    console.log(jwt);
     if (!jwt) {
-        console.log("reached the state")
         router.push('/signin');
         return [];
     }
@@ -42,7 +40,6 @@ async function getExistingShapes(roomId : string, jwt:string, router: AppRouterI
     }
 
     const data = res.data.chats;
-    console.log("The existing shapes are ", data);
 
     const shapes = data.map((x : {message:string}) => {
         const messageData = JSON.parse(x.message);
@@ -101,6 +98,14 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws 
     ctx.strokeStyle="white"
 
     const drawings = await getExistingShapes(roomId, jwt, router);
+    ws.onmessage = function (event) {
+        const messageData = JSON.parse(event.data);
+        if (messageData.type === "chat") {
+            const newShape: shapeDimentions = JSON.parse(messageData.msg);
+            drawings.push(newShape);
+            rerenderCanvas(canvas, drawings);
+        }
+    };
     rerenderCanvas(canvas, drawings);
 
     let clicked = false;

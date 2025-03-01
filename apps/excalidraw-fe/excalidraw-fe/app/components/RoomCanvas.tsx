@@ -9,6 +9,10 @@ export function RoomCanvas({roomId, jwt} : {roomId: string, jwt : string}){
         const ws =  new WebSocket(`${WS_URL}?token=${jwt}`);
         ws.onopen = ()=>{
             setSocket(ws);
+            ws.send(JSON.stringify({
+                type: "join_room",
+                roomId: roomId,
+            }));
         }
 
         return () => {

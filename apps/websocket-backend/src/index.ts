@@ -7,7 +7,7 @@ dotenv.config();
 
 const wss = new WebSocketServer({ port:8080 });
 const JWT_KEY = process.env.JWT_PASS;
-console.log("The jwt key is ", JWT_KEY);
+
 
 interface user{
   ws: WebSocket,
@@ -23,11 +23,7 @@ const users : user[] =[];
 
 function authenticateUser(token: string): string | null {
   try {
-    console.log("Authenticating token:", token);
-    
     const decoded = jwt.verify(token,"YatharthSingh");
-    console.log("Decoded token:", decoded);
-
     return decoded as string; 
   } catch (e) {
     console.error("JWT verification failed:", e);
@@ -45,7 +41,6 @@ wss.on('connection', function connection(ws, request) {
   const queryParams = new URLSearchParams(request.url?.split('?')[1]);
   const token = queryParams?.get("token") || "";
   const userId = authenticateUser(token);
-  console.log("The userId is", userId);
   if (userId == null) {
     ws.close()
     return null;
@@ -58,6 +53,7 @@ wss.on('connection', function connection(ws, request) {
       userId: userId
     }
   )
+
   
   ws.on('message', async function message(data){
     let parsedData;
@@ -78,6 +74,11 @@ wss.on('connection', function connection(ws, request) {
         const FindUser = users.find(x => x.ws == ws)
         const roomId = parsedData.roomId;
         FindUser?.rooms.push(roomId);
+        FindUser?.ws.send(JSON.stringify({
+          type: "join_room",
+          roomId: roomId,
+          msg: `User has joined room ${roomId}`
+        }))
         break;
   
       case "leave_room":
@@ -113,7 +114,7 @@ wss.on('connection', function connection(ws, request) {
         
         //Find all the users that the message needs to be sent to.
         //in other words find all the users in the given room.
-        const relevantUsers = users.forEach(usr =>{
+        users.forEach(usr =>{
             if(usr.rooms.includes(msgRoomId)){
               usr.ws.send(JSON.stringify({
                 type: "chat",
