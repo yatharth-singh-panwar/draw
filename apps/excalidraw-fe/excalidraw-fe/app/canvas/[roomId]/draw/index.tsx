@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { BACKEND_URL } from "../../../../config"
-import { RefObject, useState } from 'react';
+import { Dispatch, Ref, RefObject, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 //interface for all the types of shapes.
@@ -56,7 +56,6 @@ async function getExistingShapes(roomId: string, jwt: string, router: AppRouterI
     return shapes;
 }
 
-
 //Function to clear the canvas and render all the existing shapes.
 function rerenderCanvas(canvas: HTMLCanvasElement, drawings: [shapeDimentions]) {
     const ctx = canvas.getContext("2d");
@@ -109,7 +108,8 @@ function pushDrawingTodb(drawing: shapeDimentions, ws: WebSocket, roomId: string
 
 
 export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws: WebSocket, type: string, mouseDownHandlerRef: RefObject<any>, mouseUpHandlerRef: RefObject<any>, mouseMoveHandlerRef: RefObject<any>,
-    zoomInEventHandlerRef: RefObject<any>, jwt: string, router: AppRouterInstance) {
+    zoomInEventHandlerRef: RefObject<any>, jwt: string, router: AppRouterInstance, scaleFactor: RefObject<number>,
+    mouseXRef: RefObject<number>, mouseYRef: RefObject<number>) {
 
     const ctx = canvas.getContext("2d");
 
@@ -131,8 +131,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     rerenderCanvas(canvas, drawings);
 
     let clicked = false;
-    let startX: number, startY: number, endX: number, endY: number, scaleFactor: number, mouseXCoordinate: number, mouseYCoordinate: number;
-    let setted = false;
+    let startX: number, startY: number, endX: number, endY: number;
 
     if (mouseDownHandlerRef.current) {
         canvas.removeEventListener("mousedown", mouseDownHandlerRef.current);
@@ -149,23 +148,15 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     }
     const stroke: pencilStroke[] = [];
 
-    //In order to make a resizable rectangle that the user gives.
-    //1) Catch the x and y coordinates of the user's starting mouse click.
-    canvas.addEventListener('click', (e) => {
-        console.log("X coordinate is ", e.clientX);
-        console.log("Y coordinate is ", e.clientY);
-    })
     mouseDownHandlerRef.current = (e) => {
         clicked = true;
-        if (setted) {
+        if (scaleFactor.current > 1) {
             const clientY = e.clientY;
             const clientX = e.clientX;
-            const xDistance = Number((mouseXCoordinate - clientX) / scaleFactor) // This is the distance between mouseX on canvas original and the point
-            startX = mouseXCoordinate - xDistance;
-            const yDistance = Number((mouseYCoordinate - clientY) / scaleFactor) // This is the distance between mouseY on canvas original and the point
-            startY = mouseYCoordinate - yDistance;
-            console.log("xDistance ", xDistance);
-            console.log("yDistance", yDistance);
+            const xDistance = Number((mouseXRef.current - clientX) / scaleFactor.current) // This is the distance between mouseX on canvas original and the point
+            startX = mouseXRef.current - xDistance;
+            const yDistance = Number((mouseYRef.current - clientY) / scaleFactor.current) // This is the distance between mouseY on canvas original and the point
+            startY = mouseYRef.current - yDistance;
             console.log("Correct X location (start)", startX);
             console.log("Correct Y location (start)", startY);
         }
@@ -178,19 +169,19 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     mouseMoveHandlerRef.current = (e) => {
         if (clicked) {
             if (type == 'rect') {
-                if (!setted) {
-                    const width = e.clientX - startX;
-                    const height = e.clientY - startY;
+                if (scaleFactor.current > 1) {
+                    const xDistance = Number((mouseXRef.current - e.clientX) / scaleFactor.current) // This is the distance between mouseX on canvas original and the point
+                    const curX = mouseXRef.current - xDistance;
+                    const yDistance = Number((mouseYRef.current - e.clientY) / scaleFactor.current) // This is the distance between mouseY on canvas original and the point
+                    const curY = mouseYRef.current - yDistance;
+                    const width = curX - startX;
+                    const height = curY - startY;
                     rerenderCanvas(canvas, drawings);
                     ctx.strokeRect(startX, startY, width, height);
                 }
                 else {
-                    const xDistance = Number((mouseXCoordinate - e.clientX) / scaleFactor) // This is the distance between mouseX on canvas original and the point
-                    const curX = mouseXCoordinate - xDistance;
-                    const yDistance = Number((mouseYCoordinate - e.clientY) / scaleFactor) // This is the distance between mouseY on canvas original and the point
-                    const curY = mouseYCoordinate - yDistance;
-                    const width = curX - startX;
-                    const height = curY - startY;
+                    const width = e.clientX - startX;
+                    const height = e.clientY - startY;
                     rerenderCanvas(canvas, drawings);
                     ctx.strokeRect(startX, startY, width, height);
                 }
@@ -229,18 +220,18 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
         let newDrawing: shapeDimentions;
 
         if (type == 'rect') {
-            if (!setted) {
+            if (scaleFactor.current > 1) {
+                const xDistance = Number((mouseXRef.current - e.clientX) / scaleFactor.current) // This is the distance between mouseX on canvas original and the point
+                const endX = mouseXRef.current - xDistance;
+                const yDistance = Number((mouseYRef.current - e.clientY) / scaleFactor.current) // This is the distance between mouseY on canvas original and the point
+                const endY = mouseYRef.current - yDistance;
                 const finalWidth = endX - startX;
-                const finalHeight = endY - startY
+                const finalHeight = endY - startY;
                 newDrawing = { type: "rect", startX: startX, startY: startY, finalWidth: finalWidth, finalHeight: finalHeight }
             }
             else {
-                const xDistance = Number((mouseXCoordinate - e.clientX) / scaleFactor) // This is the distance between mouseX on canvas original and the point
-                const endX = mouseXCoordinate - xDistance;
-                const yDistance = Number((mouseYCoordinate - e.clientY) / scaleFactor) // This is the distance between mouseY on canvas original and the point
-                const endY = mouseYCoordinate - yDistance;
-                const finalWidth =  endX - startX;
-                const finalHeight = endY - startY;
+                const finalWidth = endX - startX;
+                const finalHeight = endY - startY
                 newDrawing = { type: "rect", startX: startX, startY: startY, finalWidth: finalWidth, finalHeight: finalHeight }
             }
             drawings.push(newDrawing);
@@ -261,27 +252,39 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
         pushDrawingTodb(newDrawing, ws, roomId);
     }
     zoomInEventHandlerRef.current = (e: WheelEvent) => {
-        if (!setted) {
-            if (e.ctrlKey) {
-                const deltaX = e.deltaX / 2;
-                const deltaY = e.deltaY / 2;
-                // ctx.translate(canvas.width/2, canvas.height/2);
-                if (deltaX < 0 || deltaY < 0) {
-                    return;
-                }
-                mouseXCoordinate = e.clientX;
-                mouseYCoordinate = e.clientY;
-                ctx.translate(e.clientX, e.clientY);
-                ctx.scale(5, 5);
-                //If this line is not included, then all the rerender will happen wrt the current mouse
-                //Location as the origin. This will leads to erros as our all drawings are stored
-                // WRT the origin which is 0,0.
-                ctx.translate(-e.clientX, -e.clientY);
-                scaleFactor = 5;
-                setted = true;
-                rerenderCanvas(canvas, drawings);
+        if (e.ctrlKey) {
+            if(scaleFactor.current == 1){
+                mouseXRef.current = e.clientX;
+                mouseYRef.current = e.clientY;
             }
+            ctx.setTransform(1, 0, 0, 1, 0, 0); 
+            const zoomFactor = 1.01;
+            const newXDistanceMouse = Number((mouseXRef.current - e.clientX) / scaleFactor.current)
+            const newXCoordinateMouse = mouseXRef.current - newXDistanceMouse;
+            const newYDistanceMouse = Number((mouseYRef.current - e.clientY) / ( scaleFactor.current))
+            const newYCoordinateMouse = mouseYRef.current - newYDistanceMouse;
+            // console.log("new X ",newXCoordinateMouse);
+            // console.log("new Y", newYCoordinateMouse);
+            mouseXRef.current = newXCoordinateMouse;
+            mouseYRef.current = newYCoordinateMouse;
+            ctx.translate(newXCoordinateMouse, newYCoordinateMouse);
+            ctx.scale(scaleFactor.current * zoomFactor, scaleFactor.current * zoomFactor);
+            console.log("Current scale = ", scaleFactor.current * zoomFactor);
+
+            //If this line is not included, then all the rerender will happen wrt the current mouse
+            //Location as the origin. This will leads to erros as our all drawings are stored
+            // WRT the origin which is 0,0.
+            ctx.translate(-newXCoordinateMouse, -newYCoordinateMouse);
+            
+            rerenderCanvas(canvas, drawings); //this should be commented out because if we setScaleFactor.current, the whole component will be re rendered, leading to a new rerender.
+            // setScaleFactor.current(prevScaleFactor.current => prevScaleFactor.current * zoomFactor);
+            scaleFactor.current = getNewScaleFactor(scaleFactor, zoomFactor);
         }
+    }
+
+    function getNewScaleFactor(scaleRef: RefObject<number>, zoomFactor:number){
+        const currentScaleFactor = scaleRef.current;
+        return currentScaleFactor * zoomFactor;
     }
 
 
