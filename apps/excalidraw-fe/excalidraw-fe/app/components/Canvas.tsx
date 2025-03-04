@@ -12,13 +12,14 @@ export default function Canvas({roomId, ws, jwt} : {roomId: string, ws: WebSocke
     const mouseDownHandlerRef = useRef<(e: MouseEvent) => void | null>(null);
     const mouseMoveHandlerRef = useRef<(e: MouseEvent) => void | null>(null);
     const mouseUpHandlerRef = useRef<(e: MouseEvent) => void | null>(null);
+    const zoomInEventHandlerRef = useRef<(e: WheelEvent) => void | null>(null);
 
     useEffect(()=>{
         if(canvasRef.current){
             if(!jwt){
                 router.push(`${'/signin'}`);
             }
-            canvasLogic(canvasRef.current, roomId, ws, type, mouseDownHandlerRef, mouseUpHandlerRef, mouseMoveHandlerRef,jwt, router);
+            canvasLogic(canvasRef.current, roomId, ws, type, mouseDownHandlerRef, mouseUpHandlerRef, mouseMoveHandlerRef, zoomInEventHandlerRef, jwt, router);
         }
     }, [type])
     return(
@@ -37,7 +38,7 @@ export default function Canvas({roomId, ws, jwt} : {roomId: string, ws: WebSocke
                 </div>
             </div>
             <div>
-                <canvas ref  = {canvasRef} width={2000} height={1000}> </canvas>
+                <canvas className="bg-yellow-200" ref  = {canvasRef} width={window.visualViewport.width} height={window.visualViewport.height}> </canvas>
             </div>
         </div>
     )

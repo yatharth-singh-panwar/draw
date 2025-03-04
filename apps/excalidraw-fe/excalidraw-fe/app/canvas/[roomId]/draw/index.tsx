@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { BACKEND_URL } from "../../../../config"
-import { RefObject } from 'react';
+import { RefObject, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 //interface for all the types of shapes.
@@ -11,14 +11,14 @@ interface shapeDimentions {
     finalWidth?: number, //For rectangular shape
     finalHeight?: number, //For rectangular shape 
     radius?: number  //For circle shape
-    arr ?: pencilStroke[] //for strokes of the pencil
+    arr?: pencilStroke[] //for strokes of the pencil
 }
 
-interface pencilStroke{
-    startX : number,
-    startY : number,
-    endX : number,
-    endY : number
+interface pencilStroke {
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number
 }
 
 
@@ -60,10 +60,13 @@ async function getExistingShapes(roomId: string, jwt: string, router: AppRouterI
 //Function to clear the canvas and render all the existing shapes.
 function rerenderCanvas(canvas: HTMLCanvasElement, drawings: [shapeDimentions]) {
     const ctx = canvas.getContext("2d");
+
     if (!ctx) {
         return;
     }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // ctx.fillStyle = '#000000';
+    // ctx.fill();
 
     //render all the existing shapes in the canvas.
     drawings.forEach(shape => {
@@ -75,7 +78,7 @@ function rerenderCanvas(canvas: HTMLCanvasElement, drawings: [shapeDimentions]) 
             ctx.arc(shape.startX, shape.startY, shape.radius, 0, 2 * Math.PI);
             ctx.stroke();
         }
-        else if (shape.type == 'pencil'){
+        else if (shape.type == 'pencil') {
             shape.arr?.forEach((stroke) => {
                 ctx.beginPath();
                 ctx.moveTo(stroke.startX, stroke.startY);
@@ -94,7 +97,7 @@ function pushDrawingTodb(drawing: shapeDimentions, ws: WebSocket, roomId: string
         return;
     }
     if (drawing.type == "circle" && drawing.radius < 0) {
-        console.log("Cannot push to db as the circle is smaller than 0");
+        ("Cannot push to db as the circle is smaller than 0");
         return;
     }
     ws.send(JSON.stringify({
@@ -105,9 +108,11 @@ function pushDrawingTodb(drawing: shapeDimentions, ws: WebSocket, roomId: string
 }
 
 
-export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws: WebSocket, type: string, mouseDownHandlerRef: RefObject<any>, mouseUpHandlerRef: RefObject<any>, mouseMoveHandlerRef: RefObject<any>, jwt: string, router: AppRouterInstance) {
+export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws: WebSocket, type: string, mouseDownHandlerRef: RefObject<any>, mouseUpHandlerRef: RefObject<any>, mouseMoveHandlerRef: RefObject<any>,
+    zoomInEventHandlerRef: RefObject<any>, jwt: string, router: AppRouterInstance) {
 
     const ctx = canvas.getContext("2d");
+
     if (!ctx) {
         return;
     }
@@ -126,7 +131,8 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     rerenderCanvas(canvas, drawings);
 
     let clicked = false;
-    let startX: number, startY: number, endX: number, endY: number;
+    let startX: number, startY: number, endX: number, endY: number, scaleFactor: number, mouseXCoordinate: number, mouseYCoordinate: number;
+    let setted = false;
 
     if (mouseDownHandlerRef.current) {
         canvas.removeEventListener("mousedown", mouseDownHandlerRef.current);
@@ -138,23 +144,56 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
         canvas.removeEventListener("mouseup", mouseUpHandlerRef.current);
     }
 
+    if (zoomInEventHandlerRef.current) {
+        canvas.removeEventListener("wheel", zoomInEventHandlerRef.current);
+    }
     const stroke: pencilStroke[] = [];
 
     //In order to make a resizable rectangle that the user gives.
     //1) Catch the x and y coordinates of the user's starting mouse click.
+    canvas.addEventListener('click', (e) => {
+        console.log("X coordinate is ", e.clientX);
+        console.log("Y coordinate is ", e.clientY);
+    })
     mouseDownHandlerRef.current = (e) => {
         clicked = true;
-        startX = e.clientX;
-        startY = e.clientY;
+        if (setted) {
+            const clientY = e.clientY;
+            const clientX = e.clientX;
+            const xDistance = Number((mouseXCoordinate - clientX) / scaleFactor) // This is the distance between mouseX on canvas original and the point
+            startX = mouseXCoordinate - xDistance;
+            const yDistance = Number((mouseYCoordinate - clientY) / scaleFactor) // This is the distance between mouseY on canvas original and the point
+            startY = mouseYCoordinate - yDistance;
+            console.log("xDistance ", xDistance);
+            console.log("yDistance", yDistance);
+            console.log("Correct X location (start)", startX);
+            console.log("Correct Y location (start)", startY);
+        }
+        else {
+            startX = e.clientX;
+            startY = e.clientY;
+        }
     };
     //2) Preview the rectangle as the user moves the mouse .
     mouseMoveHandlerRef.current = (e) => {
         if (clicked) {
             if (type == 'rect') {
-                const width = e.clientX - startX;
-                const height = e.clientY - startY;
-                rerenderCanvas(canvas, drawings);
-                ctx.strokeRect(startX, startY, width, height);
+                if (!setted) {
+                    const width = e.clientX - startX;
+                    const height = e.clientY - startY;
+                    rerenderCanvas(canvas, drawings);
+                    ctx.strokeRect(startX, startY, width, height);
+                }
+                else {
+                    const xDistance = Number((mouseXCoordinate - e.clientX) / scaleFactor) // This is the distance between mouseX on canvas original and the point
+                    const curX = mouseXCoordinate - xDistance;
+                    const yDistance = Number((mouseYCoordinate - e.clientY) / scaleFactor) // This is the distance between mouseY on canvas original and the point
+                    const curY = mouseYCoordinate - yDistance;
+                    const width = curX - startX;
+                    const height = curY - startY;
+                    rerenderCanvas(canvas, drawings);
+                    ctx.strokeRect(startX, startY, width, height);
+                }
             }
             else if (type == 'circle') {
                 const radius = e.clientX - startX;
@@ -170,14 +209,14 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
                 if (!clicked) return;
                 ctx.lineWidth = 2;
                 const currentX = e.clientX;
-                const currentY  = e.clientY;
+                const currentY = e.clientY;
                 ctx.beginPath();
                 ctx.moveTo(startX, startY);
                 ctx.lineTo(e.clientX, e.clientY);
                 ctx.stroke();
-                const pencilObj:pencilStroke = {startX: startX, startY: startY, endX : currentX, endY: currentY};
+                const pencilObj: pencilStroke = { startX: startX, startY: startY, endX: currentX, endY: currentY };
                 stroke.push(pencilObj);
-                console.log(stroke);
+                (stroke);
                 startX = e.clientX;
                 startY = e.clientY;
             }
@@ -187,16 +226,23 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     //3) Get the ending x and y coordinates of the user ending mouse click.
     mouseUpHandlerRef.current = (e) => {
         clicked = false;
-        endX = e.clientX;
-        endY = e.clientY;
         let newDrawing: shapeDimentions;
 
         if (type == 'rect') {
-            const width = endX - startX;
-            const height = endY - startY;
-            const finalWidth = endX - startX;
-            const finalHeight = endY - startY
-            newDrawing = { type: "rect", startX: startX, startY: startY, finalWidth: finalWidth, finalHeight: finalHeight }
+            if (!setted) {
+                const finalWidth = endX - startX;
+                const finalHeight = endY - startY
+                newDrawing = { type: "rect", startX: startX, startY: startY, finalWidth: finalWidth, finalHeight: finalHeight }
+            }
+            else {
+                const xDistance = Number((mouseXCoordinate - e.clientX) / scaleFactor) // This is the distance between mouseX on canvas original and the point
+                const endX = mouseXCoordinate - xDistance;
+                const yDistance = Number((mouseYCoordinate - e.clientY) / scaleFactor) // This is the distance between mouseY on canvas original and the point
+                const endY = mouseYCoordinate - yDistance;
+                const finalWidth =  endX - startX;
+                const finalHeight = endY - startY;
+                newDrawing = { type: "rect", startX: startX, startY: startY, finalWidth: finalWidth, finalHeight: finalHeight }
+            }
             drawings.push(newDrawing);
         }
         else if (type == 'circle') {
@@ -207,15 +253,41 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
             newDrawing = { type: "circle", startX, startY, radius };
         }
 
-        else if(type == "pencil") {
-            newDrawing = { type : "pencil", arr: stroke }
+        else if (type == "pencil") {
+            newDrawing = { type: "pencil", arr: stroke }
         }
 
         drawings.push(newDrawing);
         pushDrawingTodb(newDrawing, ws, roomId);
     }
+    zoomInEventHandlerRef.current = (e: WheelEvent) => {
+        if (!setted) {
+            if (e.ctrlKey) {
+                const deltaX = e.deltaX / 2;
+                const deltaY = e.deltaY / 2;
+                // ctx.translate(canvas.width/2, canvas.height/2);
+                if (deltaX < 0 || deltaY < 0) {
+                    return;
+                }
+                mouseXCoordinate = e.clientX;
+                mouseYCoordinate = e.clientY;
+                ctx.translate(e.clientX, e.clientY);
+                ctx.scale(5, 5);
+                //If this line is not included, then all the rerender will happen wrt the current mouse
+                //Location as the origin. This will leads to erros as our all drawings are stored
+                // WRT the origin which is 0,0.
+                ctx.translate(-e.clientX, -e.clientY);
+                scaleFactor = 5;
+                setted = true;
+                rerenderCanvas(canvas, drawings);
+            }
+        }
+    }
+
+
     canvas.addEventListener("mousedown", mouseDownHandlerRef.current);
     canvas.addEventListener("mousemove", mouseMoveHandlerRef.current);
     canvas.addEventListener("mouseup", mouseUpHandlerRef.current);
+    canvas.addEventListener("wheel", zoomInEventHandlerRef.current);
 }
 
