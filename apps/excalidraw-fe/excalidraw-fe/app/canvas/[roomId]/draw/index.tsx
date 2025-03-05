@@ -214,6 +214,11 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
         }
     }
 
+    canvas.addEventListener('click', (e: MouseEvent) => {
+        console.log("The x coordinate of the given point is ", e.clientX);
+        console.log("The y coordinate of the given point is ", e.clientY);
+    });
+
     //3) Get the ending x and y coordinates of the user ending mouse click.
     mouseUpHandlerRef.current = (e) => {
         clicked = false;
@@ -251,40 +256,58 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
         drawings.push(newDrawing);
         pushDrawingTodb(newDrawing, ws, roomId);
     }
+
+
+    // Declare a flag in a proper scope (e.g. module-level or component-level)
+    let zooming = false;
+
+
+    // canvas.addEventListener("keydown", ctrl){
+
+    // }
     zoomInEventHandlerRef.current = (e: WheelEvent) => {
         if (e.ctrlKey) {
-            if(scaleFactor.current == 1){
-                mouseXRef.current = e.clientX;
-                mouseYRef.current = e.clientY;
-            }
-            ctx.setTransform(1, 0, 0, 1, 0, 0); 
-            const zoomFactor = 1.01;
-            const newXDistanceMouse = Number((mouseXRef.current - e.clientX) / scaleFactor.current)
-            const newXCoordinateMouse = mouseXRef.current - newXDistanceMouse;
-            const newYDistanceMouse = Number((mouseYRef.current - e.clientY) / ( scaleFactor.current))
-            const newYCoordinateMouse = mouseYRef.current - newYDistanceMouse;
-            // console.log("new X ",newXCoordinateMouse);
-            // console.log("new Y", newYCoordinateMouse);
-            mouseXRef.current = newXCoordinateMouse;
-            mouseYRef.current = newYCoordinateMouse;
-            ctx.translate(newXCoordinateMouse, newYCoordinateMouse);
-            ctx.scale(scaleFactor.current * zoomFactor, scaleFactor.current * zoomFactor);
-            console.log("Current scale = ", scaleFactor.current * zoomFactor);
-
-            //If this line is not included, then all the rerender will happen wrt the current mouse
-            //Location as the origin. This will leads to erros as our all drawings are stored
-            // WRT the origin which is 0,0.
-            ctx.translate(-newXCoordinateMouse, -newYCoordinateMouse);
+            // On the first zoom event of this session, capture the pivot.
+            if (!zooming) {
+                const newXDistanceMouse = Number((mouseXRef.current - e.clientX)/scaleFactor.current);  
             
-            rerenderCanvas(canvas, drawings); //this should be commented out because if we setScaleFactor.current, the whole component will be re rendered, leading to a new rerender.
-            // setScaleFactor.current(prevScaleFactor.current => prevScaleFactor.current * zoomFactor);
-            scaleFactor.current = getNewScaleFactor(scaleFactor, zoomFactor);
-        }
-    }
+                // const xDistance = Number((mouseXRef.current - e.clientX) / scaleFactor.current) // This is the distance between mouseX on canvas original and the point
+                // const endX = mouseXRef.current - xDistance;
 
-    function getNewScaleFactor(scaleRef: RefObject<number>, zoomFactor:number){
-        const currentScaleFactor = scaleRef.current;
-        return currentScaleFactor * zoomFactor;
+                const newXCoordinateMouse = mouseXRef.current - newXDistanceMouse;
+                const newYDistanceMouse = Number((mouseYRef.current - e.clientY))/scaleFactor.current;
+                const newYCoordinateMouse = mouseYRef.current - newYDistanceMouse;
+                mouseXRef.current = newXCoordinateMouse;
+                mouseYRef.current = newYCoordinateMouse;
+                console.log(mouseXRef.current);
+                console.log(mouseYRef.current);
+                zooming = true;
+            }else{
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                const zoomFactor = 1.01;
+                // console.log("X COORDINATE ", mouseXRef.current);
+                // console.log("Y COORDINATE", mouseYRef.current)
+                // Update the scale factor
+                scaleFactor.current = getNewScaleFactor(scaleFactor, zoomFactor);
+                // Use the fixed pivot (stored in mouseXRef and mouseYRef) for translation
+                ctx.translate(mouseXRef.current, mouseYRef.current);
+                ctx.scale(scaleFactor.current, scaleFactor.current);
+                ctx.translate(-mouseXRef.current, -mouseYRef.current);
+    
+                rerenderCanvas(canvas, drawings);
+            }
+        } 
+    };
+    window.addEventListener("keyup", (e) => {
+        if (e.key === "Control") {
+          zooming = false;
+          console.log("Ctrl released, resetting pivot capture.");
+        }
+      });   
+
+    function getNewScaleFactor(scaleRef: RefObject<number>, zoomFactor: number) {
+        return scaleRef.current * zoomFactor;
     }
 
 
