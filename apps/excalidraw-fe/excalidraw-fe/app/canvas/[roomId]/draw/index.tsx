@@ -107,9 +107,11 @@ function pushDrawingTodb(drawing: shapeDimentions, ws: WebSocket, roomId: string
 }
 
 
+
+
 export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws: WebSocket, type: string, mouseDownHandlerRef: RefObject<any>, mouseUpHandlerRef: RefObject<any>, mouseMoveHandlerRef: RefObject<any>,
     zoomInEventHandlerRef: RefObject<any>, jwt: string, router: AppRouterInstance, scaleFactor: RefObject<number>,
-    mouseXRef: RefObject<number>, mouseYRef: RefObject<number>) {
+    mouseXRef: RefObject<number>, mouseYRef: RefObject<number>, totalScale: RefObject<number>, totalYTranslate: RefObject<number>, totalXTranslate: RefObject<number>, currentXPivot: RefObject<number>, currentYPivot: RefObject<number>) {
 
     const ctx = canvas.getContext("2d");
 
@@ -150,15 +152,16 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
 
     mouseDownHandlerRef.current = (e) => {
         clicked = true;
-        if (scaleFactor.current > 1) {
-            const clientY = e.clientY;
-            const clientX = e.clientX;
-            const xDistance = Number((mouseXRef.current - clientX) / scaleFactor.current) // This is the distance between mouseX on canvas original and the point
-            startX = mouseXRef.current - xDistance;
-            const yDistance = Number((mouseYRef.current - clientY) / scaleFactor.current) // This is the distance between mouseY on canvas original and the point
-            startY = mouseYRef.current - yDistance;
-            console.log("Correct X location (start)", startX);
-            console.log("Correct Y location (start)", startY);
+        console.log("The current scale factor is ", totalScale.current);
+        if (totalScale.current > 1) {
+
+            //1. Find the current pivot.
+            const curX = (e.clientX - totalXTranslate.current) / totalScale.current;
+            const curY = (e.clientY - totalYTranslate.current) / totalScale.current;
+
+            //3. and then translate to -x, and -y and then draw
+            startX = curX;
+            startY = curY;
         }
         else {
             startX = e.clientX;
@@ -169,17 +172,21 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     mouseMoveHandlerRef.current = (e) => {
         if (clicked) {
             if (type == 'rect') {
-                if (scaleFactor.current > 1) {
-                    const xDistance = Number((mouseXRef.current - e.clientX) / scaleFactor.current) // This is the distance between mouseX on canvas original and the point
-                    const curX = mouseXRef.current - xDistance;
-                    const yDistance = Number((mouseYRef.current - e.clientY) / scaleFactor.current) // This is the distance between mouseY on canvas original and the point
-                    const curY = mouseYRef.current - yDistance;
+                if (totalScale.current > 1) {
+                    console.log("Reached hereeeeeeee");
+                    const curX = (e.clientX - totalXTranslate.current) / totalScale.current;
+                    const curY = (e.clientY - totalYTranslate.current) / totalScale.current;
                     const width = curX - startX;
                     const height = curY - startY;
+
                     rerenderCanvas(canvas, drawings);
+                    // ctx.translate(-totalXTranslate.current, -totalYTranslate.current);
                     ctx.strokeRect(startX, startY, width, height);
+                    // ctx.translate(totalXTranslate.current, totalYTranslate.current);
+
                 }
                 else {
+                    console.log("Did not go in the requereedd")
                     const width = e.clientX - startX;
                     const height = e.clientY - startY;
                     rerenderCanvas(canvas, drawings);
@@ -225,16 +232,16 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
         let newDrawing: shapeDimentions;
 
         if (type == 'rect') {
-            if (scaleFactor.current > 1) {
-                const xDistance = Number((mouseXRef.current - e.clientX) / scaleFactor.current) // This is the distance between mouseX on canvas original and the point
-                const endX = mouseXRef.current - xDistance;
-                const yDistance = Number((mouseYRef.current - e.clientY) / scaleFactor.current) // This is the distance between mouseY on canvas original and the point
-                const endY = mouseYRef.current - yDistance;
+            if (totalScale.current > 1) { 
+                const endX = (e.clientX - totalXTranslate.current) / totalScale.current;
+                const endY = (e.clientY - totalYTranslate.current) / totalScale.current;
                 const finalWidth = endX - startX;
                 const finalHeight = endY - startY;
                 newDrawing = { type: "rect", startX: startX, startY: startY, finalWidth: finalWidth, finalHeight: finalHeight }
             }
             else {
+                const endX = e.clientX;
+                const endY  = e.clientY;
                 const finalWidth = endX - startX;
                 const finalHeight = endY - startY
                 newDrawing = { type: "rect", startX: startX, startY: startY, finalWidth: finalWidth, finalHeight: finalHeight }
@@ -261,51 +268,55 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     // Declare a flag in a proper scope (e.g. module-level or component-level)
     let zooming = false;
 
-
-    // canvas.addEventListener("keydown", ctrl){
-
-    // }
     zoomInEventHandlerRef.current = (e: WheelEvent) => {
         if (e.ctrlKey) {
-            // On the first zoom event of this session, capture the pivot.
+            const zoomFactor = 1.01;
             if (!zooming) {
-                const newXDistanceMouse = Number((mouseXRef.current - e.clientX)/scaleFactor.current);  
-            
-                // const xDistance = Number((mouseXRef.current - e.clientX) / scaleFactor.current) // This is the distance between mouseX on canvas original and the point
-                // const endX = mouseXRef.current - xDistance;
-
-                const newXCoordinateMouse = mouseXRef.current - newXDistanceMouse;
-                const newYDistanceMouse = Number((mouseYRef.current - e.clientY))/scaleFactor.current;
-                const newYCoordinateMouse = mouseYRef.current - newYDistanceMouse;
-                mouseXRef.current = newXCoordinateMouse;
-                mouseYRef.current = newYCoordinateMouse;
-                console.log(mouseXRef.current);
-                console.log(mouseYRef.current);
+                // First zoom event of this session:
+                // Convert the mouse (screen) coordinates to canvas coordinates.
+                // Formula: canvasX = (screenX - totalTranslateX) / totalScale
+                const pivotX = (e.clientX - totalXTranslate.current) / totalScale.current;
+                const pivotY = (e.clientY - totalYTranslate.current) / totalScale.current;
+                // Lock the pivot in canvas coordinates.
+                mouseXRef.current = pivotX;
+                mouseYRef.current = pivotY;
+                currentXPivot.current = pivotX;
+                currentYPivot.current = pivotY;
                 zooming = true;
-            }else{
+                console.log("Captured pivot:", pivotX, pivotY);
+            } else {
+                // Subsequent zoom events in the same session:
+                // Save the old scale.
+                const oldScale = totalScale.current;
+                // Update the overall scale factor.
+                totalScale.current *= zoomFactor;
+                // To keep the locked pivot fixed on the screen,
+                // first compute the screen coordinate of the locked pivot using the old transform:
+                const screenPivotX = mouseXRef.current * oldScale + totalXTranslate.current;
+                const screenPivotY = mouseYRef.current * oldScale + totalYTranslate.current;
+                // Now update the translation so that after scaling, the pivot stays at the same screen coordinate.
+                totalXTranslate.current = screenPivotX - mouseXRef.current * totalScale.current;
+                totalYTranslate.current = screenPivotY - mouseYRef.current * totalScale.current;
 
+                // Reset the transformation and apply the new one.
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
-                const zoomFactor = 1.01;
-                // console.log("X COORDINATE ", mouseXRef.current);
-                // console.log("Y COORDINATE", mouseYRef.current)
-                // Update the scale factor
-                scaleFactor.current = getNewScaleFactor(scaleFactor, zoomFactor);
-                // Use the fixed pivot (stored in mouseXRef and mouseYRef) for translation
-                ctx.translate(mouseXRef.current, mouseYRef.current);
-                ctx.scale(scaleFactor.current, scaleFactor.current);
-                ctx.translate(-mouseXRef.current, -mouseYRef.current);
-    
+                ctx.translate(totalXTranslate.current, totalYTranslate.current);
+                ctx.scale(totalScale.current, totalScale.current);
+
                 rerenderCanvas(canvas, drawings);
             }
-        } 
+        }
     };
+
+    // When Ctrl is released, reset zooming so that a new pivot can be captured next time.
     window.addEventListener("keyup", (e) => {
         if (e.key === "Control") {
-          zooming = false;
-          console.log("Ctrl released, resetting pivot capture.");
+            zooming = false;
+            console.log("Ctrl released, resetting pivot capture.");
         }
-      });   
+    });
 
+    // Helper function (if needed)
     function getNewScaleFactor(scaleRef: RefObject<number>, zoomFactor: number) {
         return scaleRef.current * zoomFactor;
     }
@@ -316,4 +327,3 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     canvas.addEventListener("mouseup", mouseUpHandlerRef.current);
     canvas.addEventListener("wheel", zoomInEventHandlerRef.current);
 }
-

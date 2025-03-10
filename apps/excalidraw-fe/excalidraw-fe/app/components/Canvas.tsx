@@ -10,6 +10,11 @@ export default function Canvas({ roomId, ws, jwt }: { roomId: string, ws: WebSoc
     const scaleFactor = useRef<number>(1);
     const mouseXRef = useRef<number>(0);
     const mouseYRef = useRef<number>(0);
+    const currentXPivot = useRef<number>(0);
+    const currentYPivot = useRef<number>(0);
+    const totalScale = useRef<number>(1);
+    const totalXTranslate = useRef<number>(0);
+    const totalYTranslate = useRef<number>(0);
 
 
     const router = useRouter();
@@ -24,7 +29,9 @@ export default function Canvas({ roomId, ws, jwt }: { roomId: string, ws: WebSoc
             if (!jwt) {
                 router.push(`${'/signin'}`);
             }
-            canvasLogic(canvasRef.current, roomId, ws, type, mouseDownHandlerRef, mouseUpHandlerRef, mouseMoveHandlerRef, zoomInEventHandlerRef, jwt, router, scaleFactor, mouseXRef, mouseYRef);
+            canvasLogic(canvasRef.current, roomId, ws, type, mouseDownHandlerRef, mouseUpHandlerRef, mouseMoveHandlerRef, zoomInEventHandlerRef, jwt, router, scaleFactor, mouseXRef, mouseYRef,
+                totalScale, totalXTranslate, totalYTranslate, currentXPivot, currentYPivot 
+            );
         }
     }, [type])
     return (
