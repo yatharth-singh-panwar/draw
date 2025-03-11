@@ -1,11 +1,12 @@
 import axios, { AxiosError } from 'axios';
 import { BACKEND_URL } from "../../../../config"
-import { Dispatch, Ref, RefObject, useState } from 'react';
+import { Dispatch, Ref, RefObject, useState, SetStateAction } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
+import { start } from 'repl';
 //interface for all the types of shapes.
 interface shapeDimentions {
-    type: "rect" | "circle" | "pencil",
+    type: "rect" | "circle" | "pencil" |"eraser",
     startX?: number,
     startY?: number,
     finalWidth?: number, //For rectangular shape
@@ -57,15 +58,14 @@ async function getExistingShapes(roomId: string, jwt: string, router: AppRouterI
 }
 
 //Function to clear the canvas and render all the existing shapes.
-function rerenderCanvas(canvas: HTMLCanvasElement, drawings: [shapeDimentions]) {
+function rerenderCanvas(canvas: HTMLCanvasElement, drawings: shapeDimentions[]) {
     const ctx = canvas.getContext("2d");
 
     if (!ctx) {
         return;
     }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // ctx.fillStyle = '#000000';
-    // ctx.fill();
+
 
     //render all the existing shapes in the canvas.
     drawings.forEach(shape => {
@@ -109,9 +109,9 @@ function pushDrawingTodb(drawing: shapeDimentions, ws: WebSocket, roomId: string
 
 
 
-export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws: WebSocket, type: string, mouseDownHandlerRef: RefObject<any>, mouseUpHandlerRef: RefObject<any>, mouseMoveHandlerRef: RefObject<any>,
-    zoomInEventHandlerRef: RefObject<any>, jwt: string, router: AppRouterInstance, scaleFactor: RefObject<number>,
-    mouseXRef: RefObject<number>, mouseYRef: RefObject<number>, totalScale: RefObject<number>, totalYTranslate: RefObject<number>, totalXTranslate: RefObject<number>, currentXPivot: RefObject<number>, currentYPivot: RefObject<number>) {
+export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws: WebSocket, type: string, setType: Dispatch<SetStateAction<string>>, keyboardEventHandlerRef: RefObject<any>, mouseDownHandlerRef: RefObject<any>, mouseUpHandlerRef: RefObject<any>, mouseMoveHandlerRef: RefObject<any>,
+    zoomInEventHandlerRef: RefObject<any>, jwt: string, router: AppRouterInstance,
+    mouseXRef: RefObject<number>, mouseYRef: RefObject<number>, totalScale: RefObject<number>, totalYTranslate: RefObject<number>, totalXTranslate: RefObject<number>) {
 
     const ctx = canvas.getContext("2d");
 
@@ -120,16 +120,19 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     }
 
     ctx.strokeStyle = "red"
-
+    let drawings: shapeDimentions[] = [];
     ws.onmessage = function (event) {
         const messageData = JSON.parse(event.data);
         if (messageData.type === "chat") {
             const newShape: shapeDimentions = JSON.parse(messageData.msg);
+            if(drawings.length == 0){
+                return;
+            }
             drawings.push(newShape);
             rerenderCanvas(canvas, drawings);
         }
     };
-    const drawings = await getExistingShapes(roomId, jwt, router);
+    drawings = await getExistingShapes(roomId, jwt, router);
     rerenderCanvas(canvas, drawings);
 
     let clicked = false;
@@ -148,18 +151,22 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     if (zoomInEventHandlerRef.current) {
         canvas.removeEventListener("wheel", zoomInEventHandlerRef.current);
     }
+
+    if (keyboardEventHandlerRef.current) {
+        window.removeEventListener("keydown", keyboardEventHandlerRef.current);
+    }
+
     const stroke: pencilStroke[] = [];
 
     mouseDownHandlerRef.current = (e) => {
         clicked = true;
-        console.log("The current scale factor is ", totalScale.current);
         if (totalScale.current > 1) {
 
-            //1. Find the current pivot.
+            //1. Find the current x and y coordinates on canvas system.
             const curX = (e.clientX - totalXTranslate.current) / totalScale.current;
             const curY = (e.clientY - totalYTranslate.current) / totalScale.current;
 
-            //3. and then translate to -x, and -y and then draw
+            //2. Set the StartX and StartY
             startX = curX;
             startY = curY;
         }
@@ -173,20 +180,15 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
         if (clicked) {
             if (type == 'rect') {
                 if (totalScale.current > 1) {
-                    console.log("Reached hereeeeeeee");
                     const curX = (e.clientX - totalXTranslate.current) / totalScale.current;
                     const curY = (e.clientY - totalYTranslate.current) / totalScale.current;
                     const width = curX - startX;
                     const height = curY - startY;
 
                     rerenderCanvas(canvas, drawings);
-                    // ctx.translate(-totalXTranslate.current, -totalYTranslate.current);
                     ctx.strokeRect(startX, startY, width, height);
-                    // ctx.translate(totalXTranslate.current, totalYTranslate.current);
-
                 }
                 else {
-                    console.log("Did not go in the requereedd")
                     const width = e.clientX - startX;
                     const height = e.clientY - startY;
                     rerenderCanvas(canvas, drawings);
@@ -194,54 +196,64 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
                 }
             }
             else if (type == 'circle') {
-                const radius = e.clientX - startX;
-                if (radius < 0) {
-                    return;
+                let radius;
+                if (totalScale.current > 1) {
+                    const curX = (e.clientX - totalXTranslate.current) / totalScale.current;
+                    radius = curX - startX;
+                    if (radius < 0) {
+                        return;
+                    }
+                    rerenderCanvas(canvas, drawings);
+                    ctx.beginPath();
+                    ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                    ctx.stroke();
                 }
-                rerenderCanvas(canvas, drawings);
-                ctx.beginPath();
-                ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
-                ctx.stroke();
+                else {
+                    radius = e.clientX - startX;
+                    if (radius < 0) {
+                        return;
+                    }
+                    rerenderCanvas(canvas, drawings);
+                    ctx.beginPath();
+                    ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                    ctx.stroke();
+                }
             }
             else if (type == 'pencil') {
                 if (!clicked) return;
-                ctx.lineWidth = 2;
-                const currentX = e.clientX;
-                const currentY = e.clientY;
+                ctx.lineWidth = 1;
+                const curX = (e.clientX - totalXTranslate.current) / totalScale.current;
+                const curY = (e.clientY - totalYTranslate.current) / totalScale.current;
                 ctx.beginPath();
                 ctx.moveTo(startX, startY);
-                ctx.lineTo(e.clientX, e.clientY);
+                ctx.lineTo(curX, curY);
                 ctx.stroke();
-                const pencilObj: pencilStroke = { startX: startX, startY: startY, endX: currentX, endY: currentY };
+                const pencilObj: pencilStroke = { startX: startX, startY: startY, endX: curX, endY: curY };
                 stroke.push(pencilObj);
-                (stroke);
-                startX = e.clientX;
-                startY = e.clientY;
+                startX = curX;
+                startY = curY;
             }
         }
     }
 
-    canvas.addEventListener('click', (e: MouseEvent) => {
-        console.log("The x coordinate of the given point is ", e.clientX);
-        console.log("The y coordinate of the given point is ", e.clientY);
-    });
 
     //3) Get the ending x and y coordinates of the user ending mouse click.
     mouseUpHandlerRef.current = (e) => {
         clicked = false;
         let newDrawing: shapeDimentions;
+        let endX = (e.clientX - totalXTranslate.current) / totalScale.current;
+        let endY = (e.clientY - totalYTranslate.current) / totalScale.current;
 
         if (type == 'rect') {
-            if (totalScale.current > 1) { 
-                const endX = (e.clientX - totalXTranslate.current) / totalScale.current;
-                const endY = (e.clientY - totalYTranslate.current) / totalScale.current;
+            if (totalScale.current > 1) {
                 const finalWidth = endX - startX;
                 const finalHeight = endY - startY;
                 newDrawing = { type: "rect", startX: startX, startY: startY, finalWidth: finalWidth, finalHeight: finalHeight }
             }
             else {
-                const endX = e.clientX;
-                const endY  = e.clientY;
+                endX = e.clientX;
+                endY = e.clientY;
+
                 const finalWidth = endX - startX;
                 const finalHeight = endY - startY
                 newDrawing = { type: "rect", startX: startX, startY: startY, finalWidth: finalWidth, finalHeight: finalHeight }
@@ -253,7 +265,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
             if (radius < 0) {
                 return;
             }
-            newDrawing = { type: "circle", startX, startY, radius };
+            newDrawing = { type: "circle", startX: startX, startY: startY, radius: radius };
         }
 
         else if (type == "pencil") {
@@ -272,7 +284,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
         if (e.ctrlKey) {
             const zoomFactor = 1.01;
             if (!zooming) {
-                // First zoom event of this session:
+                // First zoom event of this sessio  n:
                 // Convert the mouse (screen) coordinates to canvas coordinates.
                 // Formula: canvasX = (screenX - totalTranslateX) / totalScale
                 const pivotX = (e.clientX - totalXTranslate.current) / totalScale.current;
@@ -280,10 +292,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
                 // Lock the pivot in canvas coordinates.
                 mouseXRef.current = pivotX;
                 mouseYRef.current = pivotY;
-                currentXPivot.current = pivotX;
-                currentYPivot.current = pivotY;
                 zooming = true;
-                console.log("Captured pivot:", pivotX, pivotY);
             } else {
                 // Subsequent zoom events in the same session:
                 // Save the old scale.
@@ -316,14 +325,25 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
         }
     });
 
-    // Helper function (if needed)
-    function getNewScaleFactor(scaleRef: RefObject<number>, zoomFactor: number) {
-        return scaleRef.current * zoomFactor;
+    keyboardEventHandlerRef.current = (e: KeyboardEvent) => {
+        if (e.key === "1") {
+            console.log("Reached at 1");
+            setType("rect");
+        }
+        if (e.key === "2") {
+            setType("circle");
+        }
+        if (e.key === "3") {
+            setType("pencil");
+        }
+        if (e.key === "4") {
+            setType("eraser");
+        }
     }
-
 
     canvas.addEventListener("mousedown", mouseDownHandlerRef.current);
     canvas.addEventListener("mousemove", mouseMoveHandlerRef.current);
     canvas.addEventListener("mouseup", mouseUpHandlerRef.current);
     canvas.addEventListener("wheel", zoomInEventHandlerRef.current);
+    window.addEventListener("keydown", keyboardEventHandlerRef.current);
 }
