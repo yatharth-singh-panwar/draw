@@ -25,8 +25,13 @@ interface shapePaths {
     path: Path2D,
     dimentions: shapeDimentions
 }
-
-let shapePaths = [];
+interface shapesWithId {
+    id: Number,
+    dimentions: shapeDimentions
+}
+let shapePaths: shapePaths[] = [];
+let shapesWithId: shapesWithId[] = [];
+let idOfshapesToDelete: Number[] = [];
 
 //get all the existing shapes and then render it.
 async function getExistingShapes(roomId: string, jwt: string, router: AppRouterInstance) {
@@ -55,11 +60,37 @@ async function getExistingShapes(roomId: string, jwt: string, router: AppRouterI
 
     const data = res.data.chats;
 
+    shapesWithId = data.map((x: { id: Number, message: string }) => {
+        const messageData = JSON.parse(x.message);
+        const id = Number(x.id);
+        const finalObj = { id: id, dimentions: messageData }
+        return finalObj;
+    })
+
     const shapes = data.map((x: { message: string }) => {
         const messageData = JSON.parse(x.message);
         return messageData;
     })
     return shapes;
+}
+
+async function deleteChats(roomId: string, chats: Number[], jwt: string) {
+    console.log("Id of the chats to be deleted is",chats);
+    const stringifiedChat = JSON.stringify(chats);
+    try {
+        await axios.delete(`${BACKEND_URL}` + `/space/${roomId}/chat`, {
+            data: {
+                chats: stringifiedChat
+            },
+            headers: {
+                cookie: `jwt=${jwt}`
+            },
+            withCredentials: true
+        })
+    }
+    catch(e){
+        console.log(e);
+    }
 }
 
 //Function to clear the canvas and render all the existing shapes.
@@ -242,9 +273,15 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
             else if (type == 'eraser') {
                 if (!clicked) return;
                 shapePaths.forEach(drawing => {
-                    console.log(drawing);
+                    // console.log(drawing.dimentions);
                     if (ctx.isPointInStroke(drawing.path, e.clientX, e.clientY)) {
                         drawings = drawings.filter((drawingItem) => drawingItem !== drawing.dimentions);
+                        const drawingDimentionString = JSON.stringify(drawing.dimentions);
+                        const drawingId = Number((shapesWithId.find((item) => {
+                            const idDimentionString = JSON.stringify(item.dimentions);
+                            return idDimentionString === drawingDimentionString;
+                        })).id);
+                        idOfshapesToDelete.push(drawingId);
                         rerenderCanvas(canvas, drawings);
                         //Also keep a track of the drawings delted so that after the event is mouseup,
                         // it can be deleted from the database as well
@@ -289,6 +326,8 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
             newDrawing = { type: "pencil", arr: stroke }
         }
         else if (type == 'eraser') {
+            deleteChats(roomId, idOfshapesToDelete, jwt);
+            idOfshapesToDelete=[];
             return;
         }
 

@@ -204,8 +204,8 @@ app.delete('/space/:roomId',authentication, async (req: Request,res: Response)=>
 //Delete chat
 app.delete('/space/:roomId/chat', authentication, async (req: Request, res: Response) => {
     const roomId = Number(req.params.roomId);
-    const chats: number[] = req.body.chats; // Assuming chat array contains chat IDs
-
+    const chatsStringified= req.body.chats; // Assuming chat array contains chat IDs
+    const chats  = JSON.parse(chatsStringified);
     try {
         await prismaClient.chat.deleteMany({
             where: {
