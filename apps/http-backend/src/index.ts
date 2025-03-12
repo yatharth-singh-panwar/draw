@@ -180,7 +180,7 @@ app.post('/roomjoin',async (req: Request, res: Response) => {
 
 })
 //Delete room
-app.delete('/space/:roomId', async (req: Request,res: Response)=>{
+app.delete('/space/:roomId',authentication, async (req: Request,res: Response)=>{
     const roomId = Number(req.params.roomId);
     console.log(roomId);
     try{
@@ -200,6 +200,32 @@ app.delete('/space/:roomId', async (req: Request,res: Response)=>{
         })
     }
 })
+
+//Delete chat
+app.delete('/space/:roomId/chat', authentication, async (req: Request, res: Response) => {
+    const roomId = Number(req.params.roomId);
+    const chats: number[] = req.body.chats; // Assuming chat array contains chat IDs
+
+    try {
+        await prismaClient.chat.deleteMany({
+            where: {
+                roomId: roomId,
+                id: {
+                    in: chats
+                }
+            }
+        });
+
+        res.status(200).send({
+            msg: "Chats deleted successfully"
+        });
+    } catch (error) {
+        res.status(500).send({
+            msg: "Error deleting chats",
+            error: error
+        });
+    }
+});
 
 
 //get all the existing shapes in the database

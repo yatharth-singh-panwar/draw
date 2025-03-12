@@ -6,7 +6,7 @@ import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.share
 import { start } from 'repl';
 //interface for all the types of shapes.
 interface shapeDimentions {
-    type: "rect" | "circle" | "pencil" |"eraser",
+    type: "rect" | "circle" | "pencil" | "eraser",
     startX?: number,
     startY?: number,
     finalWidth?: number, //For rectangular shape
@@ -21,7 +21,12 @@ interface pencilStroke {
     endX: number,
     endY: number
 }
+interface shapePaths {
+    path: Path2D,
+    dimentions: shapeDimentions
+}
 
+let shapePaths = [];
 
 //get all the existing shapes and then render it.
 async function getExistingShapes(roomId: string, jwt: string, router: AppRouterInstance) {
@@ -65,26 +70,26 @@ function rerenderCanvas(canvas: HTMLCanvasElement, drawings: shapeDimentions[]) 
         return;
     }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    //reset the shape paths
+    shapePaths.length = 0;
 
     //render all the existing shapes in the canvas.
     drawings.forEach(shape => {
+        const path = new Path2D();
         if (shape.type == "rect") {
-            ctx.strokeRect(shape.startX, shape.startY, shape.finalWidth, shape.finalHeight);
+            path.rect(shape.startX, shape.startY, shape.finalWidth, shape.finalHeight);
         }
         else if (shape.type == "circle") {
-            ctx.beginPath();
-            ctx.arc(shape.startX, shape.startY, shape.radius, 0, 2 * Math.PI);
-            ctx.stroke();
+            path.arc(shape.startX, shape.startY, shape.radius, 0, 2 * Math.PI);
         }
         else if (shape.type == 'pencil') {
             shape.arr?.forEach((stroke) => {
-                ctx.beginPath();
-                ctx.moveTo(stroke.startX, stroke.startY);
-                ctx.lineTo(stroke.endX, stroke.endY);
-                ctx.stroke();
+                path.moveTo(stroke.startX, stroke.startY);
+                path.lineTo(stroke.endX, stroke.endY);
             });
         }
+        ctx.stroke(path);
+        shapePaths.push({ path: path, dimentions: shape });
     })
 
 }
@@ -106,9 +111,6 @@ function pushDrawingTodb(drawing: shapeDimentions, ws: WebSocket, roomId: string
     }));
 }
 
-
-
-
 export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws: WebSocket, type: string, setType: Dispatch<SetStateAction<string>>, keyboardEventHandlerRef: RefObject<any>, mouseDownHandlerRef: RefObject<any>, mouseUpHandlerRef: RefObject<any>, mouseMoveHandlerRef: RefObject<any>,
     zoomInEventHandlerRef: RefObject<any>, jwt: string, router: AppRouterInstance,
     mouseXRef: RefObject<number>, mouseYRef: RefObject<number>, totalScale: RefObject<number>, totalYTranslate: RefObject<number>, totalXTranslate: RefObject<number>) {
@@ -120,12 +122,13 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     }
 
     ctx.strokeStyle = "red"
+    ctx.lineWidth = 4
     let drawings: shapeDimentions[] = [];
     ws.onmessage = function (event) {
         const messageData = JSON.parse(event.data);
         if (messageData.type === "chat") {
             const newShape: shapeDimentions = JSON.parse(messageData.msg);
-            if(drawings.length == 0){
+            if (drawings.length == 0) {
                 return;
             }
             drawings.push(newShape);
@@ -160,6 +163,9 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
 
     mouseDownHandlerRef.current = (e) => {
         clicked = true;
+        if (type == "eraser") {
+            console.log("The type is eraser")
+        }
         if (totalScale.current > 1) {
 
             //1. Find the current x and y coordinates on canvas system.
@@ -233,9 +239,20 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
                 startX = curX;
                 startY = curY;
             }
+            else if (type == 'eraser') {
+                if (!clicked) return;
+                shapePaths.forEach(drawing => {
+                    console.log(drawing);
+                    if (ctx.isPointInStroke(drawing.path, e.clientX, e.clientY)) {
+                        drawings = drawings.filter((drawingItem) => drawingItem !== drawing.dimentions);
+                        rerenderCanvas(canvas, drawings);
+                        //Also keep a track of the drawings delted so that after the event is mouseup,
+                        // it can be deleted from the database as well
+                    }
+                })
+            }
         }
     }
-
 
     //3) Get the ending x and y coordinates of the user ending mouse click.
     mouseUpHandlerRef.current = (e) => {
@@ -270,6 +287,9 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
 
         else if (type == "pencil") {
             newDrawing = { type: "pencil", arr: stroke }
+        }
+        else if (type == 'eraser') {
+            return;
         }
 
         drawings.push(newDrawing);
