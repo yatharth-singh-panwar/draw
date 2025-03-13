@@ -1,97 +1,12 @@
-import axios, { AxiosError } from 'axios';
-import { BACKEND_URL } from "../../../../config"
 import { Dispatch, Ref, RefObject, useState, SetStateAction } from 'react';
-import { useRouter } from 'next/navigation';
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
-import { start } from 'repl';
-//interface for all the types of shapes.
-interface shapeDimentions {
-    type: "rect" | "circle" | "pencil" | "eraser",
-    startX?: number,
-    startY?: number,
-    finalWidth?: number, //For rectangular shape
-    finalHeight?: number, //For rectangular shape 
-    radius?: number  //For circle shape
-    arr?: pencilStroke[] //for strokes of the pencil
-}
+import type { shapesWithId, shapePaths, shapeDimentions, pencilStroke } from '../interfaces/interface';
+import { getExistingShapes, deleteChats, pushDrawingTodb } from '../apiCalls/api';
 
-interface pencilStroke {
-    startX: number,
-    startY: number,
-    endX: number,
-    endY: number
-}
-interface shapePaths {
-    path: Path2D,
-    dimentions: shapeDimentions
-}
-interface shapesWithId {
-    id: Number,
-    dimentions: shapeDimentions
-}
 let shapePaths: shapePaths[] = [];
 let shapesWithId: shapesWithId[] = [];
 let idOfshapesToDelete: Number[] = [];
-
-//get all the existing shapes and then render it.
-async function getExistingShapes(roomId: string, jwt: string, router: AppRouterInstance) {
-    if (!jwt) {
-        router.push('/signin');
-        return [];
-    }
-    let res;
-    try {
-        res = await axios.get(`${BACKEND_URL}` + `/chats/${roomId}`, {
-            headers: {
-                cookie: `jwt=${jwt}`
-            },
-            withCredentials: true
-        });
-
-    }
-    catch (error) {
-        if (axios.isAxiosError(error) && error.response) {
-            if (error.response.status == 403) {
-                router.push('/signin');
-                return [];
-            }
-        }
-    }
-
-    const data = res.data.chats;
-
-    shapesWithId = data.map((x: { id: Number, message: string }) => {
-        const messageData = JSON.parse(x.message);
-        const id = Number(x.id);
-        const finalObj = { id: id, dimentions: messageData }
-        return finalObj;
-    })
-
-    const shapes = data.map((x: { message: string }) => {
-        const messageData = JSON.parse(x.message);
-        return messageData;
-    })
-    return shapes;
-}
-
-async function deleteChats(roomId: string, chats: Number[], jwt: string) {
-    console.log("Id of the chats to be deleted is",chats);
-    const stringifiedChat = JSON.stringify(chats);
-    try {
-        await axios.delete(`${BACKEND_URL}` + `/space/${roomId}/chat`, {
-            data: {
-                chats: stringifiedChat
-            },
-            headers: {
-                cookie: `jwt=${jwt}`
-            },
-            withCredentials: true
-        })
-    }
-    catch(e){
-        console.log(e);
-    }
-}
+const stroke: pencilStroke[] = [];
 
 //Function to clear the canvas and render all the existing shapes.
 function rerenderCanvas(canvas: HTMLCanvasElement, drawings: shapeDimentions[]) {
@@ -125,23 +40,6 @@ function rerenderCanvas(canvas: HTMLCanvasElement, drawings: shapeDimentions[]) 
 
 }
 
-function pushDrawingTodb(drawing: shapeDimentions, ws: WebSocket, roomId: string) {
-    if (drawing == undefined || drawing.type === "circle" && drawing.radius == undefined ||
-        drawing.type === 'rect' && (drawing.finalWidth == undefined || drawing.finalHeight == undefined)
-    ) {
-        return;
-    }
-    if (drawing.type == "circle" && drawing.radius < 0) {
-        ("Cannot push to db as the circle is smaller than 0");
-        return;
-    }
-    ws.send(JSON.stringify({
-        type: "chat",
-        msg: JSON.stringify(drawing),
-        roomId: roomId
-    }));
-}
-
 export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws: WebSocket, type: string, setType: Dispatch<SetStateAction<string>>, keyboardEventHandlerRef: RefObject<any>, mouseDownHandlerRef: RefObject<any>, mouseUpHandlerRef: RefObject<any>, mouseMoveHandlerRef: RefObject<any>,
     zoomInEventHandlerRef: RefObject<any>, jwt: string, router: AppRouterInstance,
     mouseXRef: RefObject<number>, mouseYRef: RefObject<number>, totalScale: RefObject<number>, totalYTranslate: RefObject<number>, totalXTranslate: RefObject<number>) {
@@ -166,7 +64,10 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
             rerenderCanvas(canvas, drawings);
         }
     };
-    drawings = await getExistingShapes(roomId, jwt, router);
+    const response = await getExistingShapes(roomId, jwt, router);
+    drawings = response[0];
+    shapesWithId = response[1];
+
     rerenderCanvas(canvas, drawings);
 
     let clicked = false;
@@ -189,8 +90,6 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     if (keyboardEventHandlerRef.current) {
         window.removeEventListener("keydown", keyboardEventHandlerRef.current);
     }
-
-    const stroke: pencilStroke[] = [];
 
     mouseDownHandlerRef.current = (e) => {
         clicked = true;
@@ -258,7 +157,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
             }
             else if (type == 'pencil') {
                 if (!clicked) return;
-                ctx.lineWidth = 1;
+                ctx.lineWidth = 3;
                 const curX = (e.clientX - totalXTranslate.current) / totalScale.current;
                 const curY = (e.clientY - totalYTranslate.current) / totalScale.current;
                 ctx.beginPath();
@@ -327,7 +226,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
         }
         else if (type == 'eraser') {
             deleteChats(roomId, idOfshapesToDelete, jwt);
-            idOfshapesToDelete=[];
+            idOfshapesToDelete = [];
             return;
         }
 
