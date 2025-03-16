@@ -96,7 +96,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
         if (type == "eraser") {
             console.log("The type is eraser")
         }
-        if (totalScale.current > 1) {
+        if (totalScale.current > 1 || totalScale.current < 1) {
 
             //1. Find the current x and y coordinates on canvas system.
             const curX = (e.clientX - totalXTranslate.current) / totalScale.current;
@@ -115,7 +115,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     mouseMoveHandlerRef.current = (e) => {
         if (clicked) {
             if (type == 'rect') {
-                if (totalScale.current > 1) {
+                if (totalScale.current > 1 || totalScale.current < 1) {
                     const curX = (e.clientX - totalXTranslate.current) / totalScale.current;
                     const curY = (e.clientY - totalYTranslate.current) / totalScale.current;
                     const width = curX - startX;
@@ -179,7 +179,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
                         const drawingId = Number((shapesWithId.find((item) => {
                             const idDimentionString = JSON.stringify(item.dimentions);
                             return idDimentionString === drawingDimentionString;
-                        })).id);
+                        }))?.id);
                         idOfshapesToDelete.push(drawingId);
                         rerenderCanvas(canvas, drawings);
                         //Also keep a track of the drawings delted so that after the event is mouseup,
@@ -239,49 +239,66 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     let zooming = false;
 
     zoomInEventHandlerRef.current = (e: WheelEvent) => {
-        if (e.ctrlKey) {
-            const zoomFactor = 1.01;
-            if (!zooming) {
-                // First zoom event of this sessio  n:
-                // Convert the mouse (screen) coordinates to canvas coordinates.
-                // Formula: canvasX = (screenX - totalTranslateX) / totalScale
-                const pivotX = (e.clientX - totalXTranslate.current) / totalScale.current;
-                const pivotY = (e.clientY - totalYTranslate.current) / totalScale.current;
-                // Lock the pivot in canvas coordinates.
-                mouseXRef.current = pivotX;
-                mouseYRef.current = pivotY;
-                zooming = true;
-            } else {
-                // Subsequent zoom events in the same session:
-                // Save the old scale.
-                const oldScale = totalScale.current;
-                // Update the overall scale factor.
-                totalScale.current *= zoomFactor;
-                // To keep the locked pivot fixed on the screen,
-                // first compute the screen coordinate of the locked pivot using the old transform:
-                const screenPivotX = mouseXRef.current * oldScale + totalXTranslate.current;
-                const screenPivotY = mouseYRef.current * oldScale + totalYTranslate.current;
-                // Now update the translation so that after scaling, the pivot stays at the same screen coordinate.
-                totalXTranslate.current = screenPivotX - mouseXRef.current * totalScale.current;
-                totalYTranslate.current = screenPivotY - mouseYRef.current * totalScale.current;
-
-                // Reset the transformation and apply the new one.
+        let zoomFactor;
+        if (e.deltaY > 0) {
+            zoomFactor = 1.01;
+        }
+        else {
+            zoomFactor = 1 / 1.01;
+        }
+        if (!zooming) {
+            // First zoom event of this sessio  n:
+            // Convert the mouse (screen) coordinates to canvas coordinates.
+            // Formula: canvasX = (screenX - totalTranslateX) / totalScale
+            const pivotX = (e.clientX - totalXTranslate.current) / totalScale.current;
+            const pivotY = (e.clientY - totalYTranslate.current) / totalScale.current;
+            // Lock the pivot in canvas coordinates.
+            mouseXRef.current = pivotX;
+            mouseYRef.current = pivotY;
+            zooming = true;
+        } else {
+            // Subsequent zoom events in the same session:
+            // Save the old scale.
+            const oldScale = totalScale.current;
+            // Prevent zooming out below 1x:
+            if (e.deltaY < 0 && oldScale* totalScale.current < 1) {
+                // Snap scale to 1 and reset translation to (0,0)
+                totalScale.current = 1;
+                totalXTranslate.current = 0;
+                totalYTranslate.current = 0;
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
-                ctx.translate(totalXTranslate.current, totalYTranslate.current);
-                ctx.scale(totalScale.current, totalScale.current);
-
                 rerenderCanvas(canvas, drawings);
+                return;
             }
+
+            // Update the overall scale factor.
+            totalScale.current *= zoomFactor;
+            // To keep the locked pivot fixed on the screen,
+            // first compute the screen coordinate of the locked pivot using the old transform:
+            const screenPivotX = mouseXRef.current * oldScale + totalXTranslate.current;
+            const screenPivotY = mouseYRef.current * oldScale + totalYTranslate.current;
+            // Now update the translation so that after scaling, the pivot stays at the same screen coordinate.
+            totalXTranslate.current = screenPivotX - mouseXRef.current * totalScale.current;
+            totalYTranslate.current = screenPivotY - mouseYRef.current * totalScale.current;
+
+            // Reset the transformation and apply the new one.
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.translate(totalXTranslate.current, totalYTranslate.current);
+            ctx.scale(totalScale.current, totalScale.current);
+
+            rerenderCanvas(canvas, drawings);
+            zooming=false;
+
         }
     };
 
     // When Ctrl is released, reset zooming so that a new pivot can be captured next time.
-    window.addEventListener("keyup", (e) => {
-        if (e.key === "Control") {
-            zooming = false;
-            console.log("Ctrl released, resetting pivot capture.");
-        }
-    });
+    // window.addEventListener("keyup", (e) => {
+    //     if (e.key === "Control") {
+    //         zooming = false;
+    //         console.log("Ctrl released, resetting pivot capture.");
+    //     }
+    // });
 
     keyboardEventHandlerRef.current = (e: KeyboardEvent) => {
         if (e.key === "1") {
