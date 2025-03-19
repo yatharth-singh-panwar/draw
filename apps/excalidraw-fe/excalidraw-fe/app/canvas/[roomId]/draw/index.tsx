@@ -51,7 +51,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     }
 
     ctx.strokeStyle = "red"
-    ctx.lineWidth = 4
+    ctx.lineWidth = 3
     let drawings: shapeDimentions[] = [];
     ws.onmessage = function (event) {
         const messageData = JSON.parse(event.data);
@@ -171,21 +171,38 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
             }
             else if (type == 'eraser') {
                 if (!clicked) return;
-                shapePaths.forEach(drawing => {
-                    // console.log(drawing.dimentions);
-                    if (ctx.isPointInStroke(drawing.path, e.clientX, e.clientY)) {
-                        drawings = drawings.filter((drawingItem) => drawingItem !== drawing.dimentions);
-                        const drawingDimentionString = JSON.stringify(drawing.dimentions);
-                        const drawingId = Number((shapesWithId.find((item) => {
-                            const idDimentionString = JSON.stringify(item.dimentions);
-                            return idDimentionString === drawingDimentionString;
-                        }))?.id);
-                        idOfshapesToDelete.push(drawingId);
-                        rerenderCanvas(canvas, drawings);
-                        //Also keep a track of the drawings delted so that after the event is mouseup,
-                        // it can be deleted from the database as well
-                    }
-                })
+                const eraserSize = 55; // Adjust this value to increase/decrease the eraser size
+                const curX = e.clientX;
+                const curY = e.clientY;
+
+                // Interpolate points between the previous and current cursor positions
+                const steps = 10; // Number of interpolation steps
+                const deltaX = (curX - startX) / steps;
+                const deltaY = (curY - startY) / steps;
+
+                for (let i = 0; i <= steps; i++) {
+                    const interpolatedX = startX + deltaX * i;
+                    const interpolatedY = startY + deltaY * i;
+
+                    shapePaths.forEach(drawing => {
+                        const eraserPath = new Path2D();
+                        eraserPath.rect(interpolatedX - eraserSize / 2, interpolatedY - eraserSize / 2, eraserSize, eraserSize);
+
+                        if (ctx.isPointInPath(eraserPath, drawing.dimentions.startX, drawing.dimentions.startY) || 
+                            ctx.isPointInStroke(drawing.path, interpolatedX, interpolatedY)) {
+                            drawings = drawings.filter((drawingItem) => drawingItem !== drawing.dimentions);
+                            const drawingDimentionString = JSON.stringify(drawing.dimentions);
+                            const drawingId = Number((shapesWithId.find((item) => {
+                                const idDimentionString = JSON.stringify(item.dimentions);
+                                return idDimentionString === drawingDimentionString;
+                            }))?.id);
+                            idOfshapesToDelete.push(drawingId);
+                            rerenderCanvas(canvas, drawings);
+                        }
+                    });
+                }
+                startX = curX;
+                startY = curY;
             }
         }
     }
@@ -244,6 +261,15 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
             zoomFactor = 1.01;
         }
         else {
+            if(totalScale.current ==1){
+                totalScale.current = 1;
+                totalXTranslate.current = 0;
+                totalYTranslate.current = 0;
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                rerenderCanvas(canvas, drawings);
+                return;
+                return;
+            }
             zoomFactor = 1 / 1.01;
         }
         if (!zooming) {
@@ -263,12 +289,7 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
             // Prevent zooming out below 1x:
             if (e.deltaY < 0 && oldScale* totalScale.current < 1) {
                 // Snap scale to 1 and reset translation to (0,0)
-                totalScale.current = 1;
-                totalXTranslate.current = 0;
-                totalYTranslate.current = 0;
-                ctx.setTransform(1, 0, 0, 1, 0, 0);
-                rerenderCanvas(canvas, drawings);
-                return;
+               
             }
 
             // Update the overall scale factor.
@@ -291,15 +312,6 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
 
         }
     };
-
-    // When Ctrl is released, reset zooming so that a new pivot can be captured next time.
-    // window.addEventListener("keyup", (e) => {
-    //     if (e.key === "Control") {
-    //         zooming = false;
-    //         console.log("Ctrl released, resetting pivot capture.");
-    //     }
-    // });
-
     keyboardEventHandlerRef.current = (e: KeyboardEvent) => {
         if (e.key === "1") {
             console.log("Reached at 1");
