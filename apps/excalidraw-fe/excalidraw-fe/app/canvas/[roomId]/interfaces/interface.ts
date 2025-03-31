@@ -7,6 +7,7 @@ export interface shapeDimentions {
     radius?: number  //For circle shape
     arr?: pencilStroke[] //for strokes of the pencil
 }
+export type toolTypes =  "rect" | "circle" | "pencil" | "eraser"| "pan";
 
 export interface pencilStroke {
     startX: number,
