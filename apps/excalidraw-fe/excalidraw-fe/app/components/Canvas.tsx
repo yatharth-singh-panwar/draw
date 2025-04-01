@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { MenubarBar } from "../canvas/[roomId]/draw/toolbar";
 import { Game } from "../canvas/[roomId]/draw/Game";
 import { toolTypes } from "../canvas/[roomId]/interfaces/interface";
+import { Option } from "../canvas/[roomId]/draw/Option";
 
 export default function Canvas({ roomId, ws, jwt }: { roomId: string, ws: WebSocket, jwt: string }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -54,9 +55,12 @@ export default function Canvas({ roomId, ws, jwt }: { roomId: string, ws: WebSoc
         }
     }, [canvasRef])
     return (
-        <div>
-            <div className="absolute w-screen flex items-center justify-center ">
+        <div>   
+            <div className="absolute w-screen flex items-center justify-center p-2">
                 <MenubarBar type={type} setType={setType} game={game} jwt={jwt} roomId={roomId} router={router}/>
+            </div>
+            <div className="absolute ">
+                <Option></Option>
             </div>
             <div>
                 <canvas className="bg-blue-950" ref={canvasRef} width={window.visualViewport.width} height={window.visualViewport.height}> </canvas>

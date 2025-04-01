@@ -320,25 +320,25 @@ export async function canvasLogic(canvas: HTMLCanvasElement, roomId: string, ws:
     };
 
     keyboardEventHandlerRef.current = async (e: KeyboardEvent) => {
-        if (e.key === "1") {
+        if (e.key === "2") {
             game.currentType == 'rect';
             setType("rect")
         }
-        if (e.key === "2") {
+        if (e.key === "3") {
             game.currentType == "circle";
             setType("circle")
         }
-        if (e.key === "3") {
+        if (e.key === "4") {
             game.currentType == "pencil";
             setType("pencil")
         }
-        if (e.key === "4") {
+        if (e.key === "5") {
             game.currentType == "eraser";
             const res = await getExistingShapes(roomId, jwt, router);
             game.shapesWithId = res[1];
             setType("eraser")
         }
-        if (e.key == '5') {
+        if (e.key == '1') {
             game.currentType = "pan";
             setType('pan');
         }
