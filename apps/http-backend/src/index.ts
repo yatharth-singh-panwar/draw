@@ -114,6 +114,7 @@ app.post('/signin', async (req: Request, res: Response)=> {
                 password:password
             }
         })
+        console.log('user');
 
         if(!user){
             res.status(404).send({
@@ -128,6 +129,7 @@ app.post('/signin', async (req: Request, res: Response)=> {
             msg:"internal server error",
             error: e
         })
+        return;
     }
 
     //give a signed jwt token to the user.

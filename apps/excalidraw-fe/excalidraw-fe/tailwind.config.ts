@@ -19,6 +19,19 @@ export default {
         },
         grayLine: {
           DEFAULT: "#6b7280",
+        },
+        strokeOptions: {
+          white: "#ffffff",
+          red: "#e03131",
+          green: "#2f9e44",
+          blue: "#1971c2",
+          orange : "#f08c00" 
+        },
+        background: {
+          pink:"#ffc9c9",
+          green:"#b2f2bb",
+          blue:"#a5d8ff",
+          peach:"#ffec99"
         }
       },
     },

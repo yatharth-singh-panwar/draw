@@ -27,6 +27,9 @@ export default function Canvas({ roomId, ws, jwt }: { roomId: string, ws: WebSoc
 
     //initialize a new game objec to keep track of the local variables for the canvas.
     const [game, setGame] = useState<Game>();
+    const [strokeColor, setStrokeColor] = useState<String>("bg-strokeOptions-white");
+    const [background, setBackground] = useState<String>("ffffff");
+    const [strokeWidth, setStokeWidth] = useState<Number>(1);
 
     //keyboard event handler references.
     const keyboardEventHandlerRef = useRef<(e: KeyboardEvent) => void | null>(null);
@@ -49,18 +52,18 @@ export default function Canvas({ roomId, ws, jwt }: { roomId: string, ws: WebSoc
             }
             const game = new Game();
             setGame(game);
-            canvasLogic(canvasRef.current, roomId, ws,panEventHandler, keyboardEventHandlerRef, mouseDownHandlerRef, mouseUpHandlerRef, mouseMoveHandlerRef, zoomInEventHandlerRef, jwt, router, mouseXRef, mouseYRef,
+            canvasLogic(canvasRef.current, roomId, ws, panEventHandler, keyboardEventHandlerRef, mouseDownHandlerRef, mouseUpHandlerRef, mouseMoveHandlerRef, zoomInEventHandlerRef, jwt, router, mouseXRef, mouseYRef,
                 totalScale, currentXPivot, currentYPivot, game, setType
             );
         }
     }, [canvasRef])
     return (
-        <div>   
+        <div>
             <div className="absolute w-screen flex items-center justify-center p-2">
-                <MenubarBar type={type} setType={setType} game={game} jwt={jwt} roomId={roomId} router={router}/>
+                <MenubarBar type={type} setType={setType} game={game} jwt={jwt} roomId={roomId} router={router} />
             </div>
             <div className="absolute ">
-                <Option></Option>
+                <Option visible={true} strokeColor={strokeColor} background={background} strokeWidth={strokeWidth} setStrokeColor={setStrokeColor} setBackground={setBackground} setStokeWidth={setStokeWidth}></Option>
             </div>
             <div>
                 <canvas className="bg-blue-950" ref={canvasRef} width={window.visualViewport.width} height={window.visualViewport.height}> </canvas>
